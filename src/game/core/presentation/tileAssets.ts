@@ -1,4 +1,4 @@
-import { TILE_TYPES, tileFaceFile } from '../rules/tiles'
+import { ALL_TILE_TYPES, TILE_TYPES, tileFaceFile } from '../rules/tiles'
 import type { TileType } from '../contracts/types'
 
 // 牌面资产预加载：把全部牌面拉进内存（blob URL + 已解码图片各存一份），
@@ -39,7 +39,7 @@ function themeTileUrl(theme: TileAssetTheme, tile: TileType): string | null {
 
 /** 明确列出主题资源和回退资源，避免 2D/3D 各自拼接路径导致缓存串图。 */
 export function tileAssetManifest(theme: TileAssetTheme = activeTheme): TileAssetManifest {
-  const faces = Object.fromEntries(TILE_TYPES.map((tile) => [
+  const faces = Object.fromEntries(ALL_TILE_TYPES.map((tile) => [
     tile,
     [themeTileUrl(theme, tile) ?? '', legacyTileUrl(tile) ?? ''] as const,
   ])) as Record<TileType, readonly [string, string]>
@@ -137,9 +137,9 @@ export function preloadTileImages(theme: TileAssetTheme = activeTheme): Promise<
   const key = tileCacheKey(theme)
   const existing = READY_CACHE.get(key)
   if (existing) return existing
-  const loading = Promise.allSettled(TILE_TYPES.map((tile) => loadTile(theme, tile))).then((results) => {
+  const loading = Promise.allSettled(ALL_TILE_TYPES.map((tile) => loadTile(theme, tile))).then((results) => {
     const failed = results
-      .map((result, index) => result.status === 'rejected' ? TILE_TYPES[index] : null)
+      .map((result, index) => result.status === 'rejected' ? ALL_TILE_TYPES[index] : null)
       .filter((tile): tile is TileType => tile !== null)
     if (failed.length) throw new Error(`牌面资源加载失败：${failed.join('、')}`)
   })

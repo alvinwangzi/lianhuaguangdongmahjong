@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { TILE_TYPES } from '../rules/tiles'
+import { ALL_TILE_TYPES } from '../rules/tiles'
 
 const NativeURL = globalThis.URL
 
@@ -52,7 +52,7 @@ describe('tile asset preload', () => {
     await preloadTileImages()
 
     expect(m1Attempts).toBe(3)
-    expect(preloadedTileImages().size).toBe(TILE_TYPES.length)
+    expect(preloadedTileImages().size).toBe(ALL_TILE_TYPES.length)
   })
 
   it('rejects an incomplete preload and lets a later call retry only missing tiles', async () => {
@@ -69,20 +69,20 @@ describe('tile asset preload', () => {
 
     const { preloadTileImages, preloadedTileImages } = await import('./tileAssets')
     await expect(preloadTileImages()).rejects.toThrow('牌面资源加载失败：m1')
-    expect(preloadedTileImages().size).toBe(TILE_TYPES.length - 1)
+    expect(preloadedTileImages().size).toBe(ALL_TILE_TYPES.length - 1)
 
     failM1 = false
     await preloadTileImages()
 
     expect(m1Attempts).toBe(4)
-    expect(fetchMock).toHaveBeenCalledTimes(TILE_TYPES.length + 3)
-    expect(preloadedTileImages().size).toBe(TILE_TYPES.length)
+    expect(fetchMock).toHaveBeenCalledTimes(ALL_TILE_TYPES.length + 3)
+    expect(preloadedTileImages().size).toBe(ALL_TILE_TYPES.length)
   })
 
   it('publishes an explicit llmAnime manifest with a per-tile default fallback', async () => {
     const { tileAssetManifest, tileBackUrl } = await import('./tileAssets')
     const manifest = tileAssetManifest('llmAnime')
-    expect(Object.keys(manifest.faces)).toHaveLength(TILE_TYPES.length)
+    expect(Object.keys(manifest.faces)).toHaveLength(ALL_TILE_TYPES.length)
     expect(manifest.faces.m1).toEqual(['/themes/llm-anime/v1/tiles/1m.png', '/tiles/1m.png'])
     expect(manifest.faces.white).toEqual(['/themes/llm-anime/v1/tiles/7z.png', '/tiles/7z.png'])
     expect(manifest.back).toEqual(['/themes/llm-anime/v1/tile-back.png', '/tiles/tile-back.png'])
@@ -99,8 +99,8 @@ describe('tile asset preload', () => {
     await preloadTileImages('llmAnime')
     await preloadTileImages('jade')
     expect(preloadedTileImages('llmAnime')).not.toBe(preloadedTileImages('jade'))
-    expect(preloadedTileImages('llmAnime').size).toBe(TILE_TYPES.length)
-    expect(preloadedTileImages('jade').size).toBe(TILE_TYPES.length)
+    expect(preloadedTileImages('llmAnime').size).toBe(ALL_TILE_TYPES.length)
+    expect(preloadedTileImages('jade').size).toBe(ALL_TILE_TYPES.length)
   })
 
   it('shares one decoded cache across all non-anime presentation themes', async () => {
@@ -112,7 +112,7 @@ describe('tile asset preload', () => {
       await preloadTileImages(theme)
     }
 
-    expect(fetchMock).toHaveBeenCalledTimes(TILE_TYPES.length)
+    expect(fetchMock).toHaveBeenCalledTimes(ALL_TILE_TYPES.length)
     expect(preloadedTileImages('happyMahjong')).toBe(preloadedTileImages('jade'))
     expect(preloadedTileImages('rosewood')).toBe(preloadedTileImages('jade'))
     expect(preloadedTileImages('llm')).toBe(preloadedTileImages('jade'))

@@ -177,6 +177,8 @@ const TILE_NAMES: Record<TileType, string> = {
   p1: '1筒', p2: '2筒', p3: '3筒', p4: '4筒', p5: '5筒', p6: '6筒', p7: '7筒', p8: '8筒', p9: '9筒',
   s1: '1条', s2: '2条', s3: '3条', s4: '4条', s5: '5条', s6: '6条', s7: '7条', s8: '8条', s9: '9条',
   east: '东风', south: '南风', west: '西风', north: '北风', red: '红中', green: '发财', white: '白板',
+  spring: '春', summer: '夏', autumn: '秋', winter: '冬',
+  plum: '梅', orchid: '兰', bamboo: '竹', chrysanthemum: '菊',
 }
 
 export function tileName(tile: TileType): TileName {

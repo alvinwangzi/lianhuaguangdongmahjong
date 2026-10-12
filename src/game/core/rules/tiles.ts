@@ -1,7 +1,8 @@
-import type { HonorTile, Suit, TileType } from '../contracts/types'
+import type { FlowerTile, HonorTile, Suit, TileType } from '../contracts/types'
 
 export const SUITS: Suit[] = ['m', 'p', 's']
 export const HONORS: HonorTile[] = ['east', 'south', 'west', 'north', 'red', 'green', 'white']
+export const FLOWERS: FlowerTile[] = ['spring', 'summer', 'autumn', 'winter', 'plum', 'orchid', 'bamboo', 'chrysanthemum']
 
 export const TILE_META = {
   back: { name: '牌背', col: 0, row: 0 },
@@ -15,6 +16,10 @@ export const TILE_META = {
   m7: { name: '七万', col: 4, row: 3 }, p7: { name: '七筒', col: 5, row: 3 }, s7: { name: '七条', col: 6, row: 3 },
   red: { name: '红中', col: 0, row: 4 }, m8: { name: '八万', col: 1, row: 4 }, p8: { name: '八筒', col: 2, row: 4 }, s8: { name: '八条', col: 3, row: 4 },
   m9: { name: '九万', col: 4, row: 4 }, p9: { name: '九筒', col: 5, row: 4 }, s9: { name: '九条', col: 6, row: 4 },
+  spring: { name: '春', col: 0, row: 5 }, summer: { name: '夏', col: 1, row: 5 },
+  autumn: { name: '秋', col: 2, row: 5 }, winter: { name: '冬', col: 3, row: 5 },
+  plum: { name: '梅', col: 4, row: 5 }, orchid: { name: '兰', col: 5, row: 5 },
+  bamboo: { name: '竹', col: 6, row: 5 }, chrysanthemum: { name: '菊', col: 0, row: 6 },
 }
 
 export const TILE_TYPES: TileType[] = [
@@ -22,19 +27,30 @@ export const TILE_TYPES: TileType[] = [
   ...HONORS,
 ] as TileType[]
 
+/** 全部牌面类型（含花牌），用于资源加载与展示层。玩法规则仍使用 TILE_TYPES（34 张）。 */
+export const ALL_TILE_TYPES: TileType[] = [...TILE_TYPES, ...FLOWERS] as TileType[]
+
 const HONOR_FACE_INDEX = { east: 1, south: 2, west: 3, north: 4, red: 5, green: 6, white: 7 }
+const FLOWER_FACE_INDEX: Record<FlowerTile, number> = {
+  spring: 1, summer: 2, autumn: 3, winter: 4,
+  plum: 5, orchid: 6, bamboo: 7, chrysanthemum: 8,
+}
 
 export function tileFaceFile(tile: TileType) {
   const suited = /^([mps])([1-9])$/.exec(tile)
   if (suited) return `${suited[2]}${suited[1]}.png`
-  return HONOR_FACE_INDEX[tile] ? `${HONOR_FACE_INDEX[tile]}z.png` : null
+  if (tile in HONOR_FACE_INDEX) return `${HONOR_FACE_INDEX[tile as HonorTile]}z.png`
+  if (tile in FLOWER_FACE_INDEX) return `f${FLOWER_FACE_INDEX[tile as FlowerTile]}.png`
+  return null
 }
 
 /** 出牌报牌的牌名语音文件（如 3m → '3m.mp3'，东风 → '1z.mp3'）。 */
 export function tileAudioFile(tile: TileType) {
   const suited = /^([mps])([1-9])$/.exec(tile)
   if (suited) return `${suited[2]}${suited[1]}.mp3`
-  return HONOR_FACE_INDEX[tile] ? `${HONOR_FACE_INDEX[tile]}z.mp3` : null
+  if (tile in HONOR_FACE_INDEX) return `${HONOR_FACE_INDEX[tile as HonorTile]}z.mp3`
+  if (tile in FLOWER_FACE_INDEX) return `f${FLOWER_FACE_INDEX[tile as FlowerTile]}.mp3`
+  return null
 }
 
 export const tileOrder = (tile: TileType) => TILE_TYPES.indexOf(tile)
@@ -52,6 +68,14 @@ export const tileName = (tile: TileType) => TILE_META[tile]?.name ?? tile
 
 export function createWall() {
   return TILE_TYPES.flatMap((tile) => Array(4).fill(tile))
+}
+
+/** 含花牌的牌墙（144 张）：数牌/字牌各 4 张 + 花牌各 1 张。 */
+export function createWallWithFlowers() {
+  return [
+    ...TILE_TYPES.flatMap((tile) => Array(4).fill(tile)),
+    ...FLOWERS,
+  ]
 }
 
 export function shuffle<T>(items: T[], random = Math.random): T[] {
