@@ -11,6 +11,7 @@ import LlmSettingsPanel from './components/llm/LlmSettingsPanel.vue'
 import SettlementOverlay from './components/settlement/SettlementOverlay.vue'
 import ReplayListView from './components/replay/ReplayListView.vue'
 import { useGame } from './game/variants/guangma/game'
+import { useFlowerGame } from './game/variants/flowers/flowerGame'
 import { useLotusGame } from './game/variants/lotus/lotusGame'
 import { useBloodFlowGame } from './game/variants/lotus/bloodFlow/useBloodFlowGame'
 import { useBloodFlowRemoteGame } from './game/variants/lotus/bloodFlow/useBloodFlowRemoteGame'
@@ -274,6 +275,18 @@ const localGame = useGame({
   analysis: analysis.port,
   analysisSink: lotusClassicAnalysisSink,
 })
+// 花牌玩法：经典广麻引擎 + 花牌插接（牌墙 144 / 摸花亮出补摸 / 花牌计分）。仅本地。
+const flowerGame = useFlowerGame({
+  playSound: playEffect,
+  playSoundAndWait: playEffectAndWait,
+  countdownEnabled: false,
+  aiControllers: localLlm.value.controllers ?? undefined,
+  aiPlayerSeeds: localLlmSeeds,
+  humanPlayerSeed: localHumanSeed,
+  getThemeName: () => tableThemeName.value,
+  animeFixedTts: localAnimeFixedTts,
+  recorder: replay.hooks,
+})
 const lotusGame = useLotusGame({
   playSound: playEffect,
   playSoundAndWait: playEffectAndWait,
@@ -317,18 +330,22 @@ const activeRemote = computed(() => (
     : remoteGame
 ))
 
-// 莲花麻将旧版翻精规则同时支持本地与联机对战。
-const singlePlayerOnly = computed(() => false)
+// 花牌玩法仅本地：联机协议快照未含 144 张花牌牌墙与花牌副露同步。
+const singlePlayerOnly = computed(() => selectedRule.value === 'lotus-flowers')
 const usesLotusLocalEngine = computed(() => selectedRule.value === 'lotus-legacy')
 watch(() => activeRemote.value.rulesetId.value, (value) => {
   if (value === 'lotus-classic' || value === 'lotus-legacy' || value === 'lotus-blood-flow') selectedRule.value = value
 })
 
 // 类型安全的模式桥：共享状态与动作由 GamePort 显式约束，调试/房间扩展能力不混入 UI 契约。
-// local 槽按所选玩法解析到「莲花广麻」或「莲花麻将」本地引擎。
+// local 槽按所选玩法解析到「花牌广麻」「莲花广麻」或「莲花麻将」本地引擎。
 const game = createActiveGamePort(
   gameMode,
-  () => selectedRule.value === 'lotus-blood-flow' ? bloodFlowGame : usesLotusLocalEngine.value ? lotusGame : localGame,
+  () => selectedRule.value === 'lotus-blood-flow'
+    ? bloodFlowGame
+    : selectedRule.value === 'lotus-flowers'
+      ? flowerGame
+      : usesLotusLocalEngine.value ? lotusGame : localGame,
   () => activeRemote.value as GamePort,
 )
 

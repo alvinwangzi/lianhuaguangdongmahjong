@@ -21,6 +21,15 @@ interface LocalOpeningTimelineOptions {
   playerSeeds?: Array<PlayerSeed>
   /** 本家座位 0 的展示形象。 */
   humanPlayerSeed?: PlayerSeed
+  /** 变体牌墙工厂（花牌玩法传 createWallWithFlowers）；缺省为经典 136 张。 */
+  createWallTiles?: () => TileType[]
+  /** 牌墙总张数（用于拆墙断点环几何）；缺省 136。 */
+  wallTotal?: number
+  /**
+   * 变体「发牌后摘特殊牌补摸」处理（花牌玩法等），返回即时胜利座位（-1 无）。
+   * 缺省为红中逻辑（亮出前三张、第四张入手触发四红中）。
+   */
+  createDealSpecials?: (deps: LocalDealSpecialsDeps) => () => number | Promise<number>
   /**
    * 分析记录（P1 §6）：**确定性重跑所需的开局参数**在"骰子掷完、牌墙按庄家拆开、还没发牌"
    * 这一刻就齐了，交出去由引擎侧留作本局的复现起点。
@@ -46,20 +55,19 @@ export interface LocalRoundOpeningInfo {
   openingScores: number[]
 }
 
-export function createLocalOpeningTimeline(options: LocalOpeningTimelineOptions) {
-  const { state } = options
-  let sequence = 0
+/** 开局拆牌特殊处理可拿到的引擎句柄。 */
+export interface LocalDealSpecialsDeps {
+  state: LocalGameState
+  takeTile(fromTail?: boolean): TileType | null
+  /** 开局摘特殊牌时播放音效（花牌玩法在摘花前播放一次「补花」）。 */
+  playSoundAndWait?(name: string, volume?: number): Promise<void>
+  /** 等待（花牌玩法摘花节奏）。 */
+  wait?(delay: number): Promise<void>
+}
 
-  function cancel() {
-    sequence += 1
-    state.openingStage.value = null
-  }
-
-  function resetPlayers() {
-    resetLocalPlayers(state, undefined, options.playerSeeds, options.humanPlayerSeed)
-  }
-
-  function resolveDealtReds() {
+/** 默认红中逻辑：亮出前三张（花副），第四张留入手触发四红中结算。 */
+export function createRedDealSpecials({ state, takeTile }: LocalDealSpecialsDeps): () => number {
+  return () => {
     const seatOrder = state.players.map(
       (_, offset) => (state.dealer.value + offset) % state.players.length,
     )
@@ -73,10 +81,25 @@ export function createLocalOpeningTimeline(options: LocalOpeningTimelineOptions)
         player.hand.splice(player.hand.indexOf('red'), 1)
         player.redCount += 1
         player.melds.push({ type: 'flower', tile: 'red', tiles: ['red'] })
-        const replacement = options.takeTile(true)
+        const replacement = takeTile(true)
         if (replacement) player.hand.push(replacement)
       }
     }
+    return state.players.findIndex((player) => player.redCount >= 4)
+  }
+}
+
+export function createLocalOpeningTimeline(options: LocalOpeningTimelineOptions) {
+  const { state } = options
+  let sequence = 0
+
+  function cancel() {
+    sequence += 1
+    state.openingStage.value = null
+  }
+
+  function resetPlayers() {
+    resetLocalPlayers(state, undefined, options.playerSeeds, options.humanPlayerSeed)
   }
 
   async function start(mode?: MatchType, startOptions: {
@@ -118,7 +141,7 @@ export function createLocalOpeningTimeline(options: LocalOpeningTimelineOptions)
     }
     state.wall.value = startOptions.initialWall
       ? [...startOptions.initialWall]
-      : shuffle(createWall())
+      : shuffle((options.createWallTiles ?? createWall)())
     state.wallHeadDrawn.value = 0
     state.result.value = null
     state.winEffect.value = null
@@ -154,7 +177,7 @@ export function createLocalOpeningTimeline(options: LocalOpeningTimelineOptions)
     await Promise.all([options.playSoundAndWait('dice.mp3'), options.wait(1150)])
     if (currentSequence !== sequence) return
 
-    const breakIndex = wallBreakIndexForDealer(state.diceValues.value, state.dealer.value)
+    const breakIndex = wallBreakIndexForDealer(state.diceValues.value, state.dealer.value, options.wallTotal)
     // 记录拆墙断点，供房主快照下发（联机模式 3D 牌山开口位置与单人模式一致）。
     state.wallBreakIndex.value = breakIndex
     // 分析记录（P1 §6）：**重跑起点**在这里交出 —— 牌墙还没被拆/发出去，`state.wall` 就是
@@ -180,7 +203,12 @@ export function createLocalOpeningTimeline(options: LocalOpeningTimelineOptions)
     })
     if (!dealt) return
 
-    resolveDealtReds()
+    const instantWinner = await (options.createDealSpecials?.({
+      state,
+      takeTile: options.takeTile,
+      playSoundAndWait: options.playSoundAndWait,
+      wait: options.wait,
+    }) ?? createRedDealSpecials({ state, takeTile: options.takeTile }))()
     state.phase.value = 'opening'
     state.openingStage.value = null
     state.dealAnimation.value = {
@@ -189,8 +217,7 @@ export function createLocalOpeningTimeline(options: LocalOpeningTimelineOptions)
       serial: state.dealAnimation.value.serial + 1,
     }
     state.players.forEach((player) => { player.hand = sortTiles(player.hand) })
-    const fourRedWinner = state.players.findIndex((player) => player.redCount >= 4)
-    if (fourRedWinner >= 0) return options.endGame(fourRedWinner, { fourRed: true })
+    if (instantWinner >= 0) return options.endGame(instantWinner, { fourRed: true })
     options.announce(`${options.getRoundLabel()} · 开牌`)
     if (startOptions.waitForOpeningReady) {
       await startOptions.waitForOpeningReady()

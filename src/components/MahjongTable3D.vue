@@ -628,6 +628,7 @@ watch(
     props.flipStack,
     props.flipTile,
     props.wallBreakIndex,
+    props.wallTotal,
     props.bloodFlowBatches?.map(b => b.batchId).join(','),
     props.bloodFlowCompact,
     props.bloodFlowPresentationKey,

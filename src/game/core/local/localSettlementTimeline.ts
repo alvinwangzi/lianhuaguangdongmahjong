@@ -1,6 +1,6 @@
 import type { RoundResult } from '../contracts/gamePort'
 import type { EndGameOptions, TableActionType, TileType } from '../contracts/types'
-import { drawHorses } from '../rules/rules'
+import { drawHorses, flowerTilesOfMelds } from '../rules/rules'
 import { removeLastDiscard } from '../rules/actions'
 import type { LocalGameState } from './localGameState'
 import { resolveWinTile } from './matchProgress'
@@ -143,6 +143,8 @@ export function createLocalSettlementTimeline(options: LocalSettlementTimelineOp
         robbedKong: Boolean(endOptions.robbedKong),
         // 红中逐张加算：winner.redCount 在摸到红中亮出时已累加（四红中时为 4）。
         redCount: winner.redCount,
+        // 花牌玩法：已亮花牌列表（经典广麻恒为空数组，scoreHand 忽略）。
+        flowerTiles: flowerTilesOfMelds(winner.melds),
       })
       const totalWon = ruleset.score.applyWinScore(
         state.players,

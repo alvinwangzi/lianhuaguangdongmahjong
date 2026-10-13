@@ -35,10 +35,10 @@ import { createLocalGameSelectors, structuralMeldCount } from './localGameSelect
 import { createLocalGameState } from './localGameState'
 import { createLocalKongActionExecutor } from './localKongActionExecutor'
 import { createLocalMatchLifecycle } from './localMatchLifecycle'
-import { createLocalOpeningTimeline } from './localOpeningTimeline'
+import { createLocalOpeningTimeline, type LocalDealSpecialsDeps } from './localOpeningTimeline'
 import { createLocalPlayerActionController } from './localPlayerActionController'
 import { createLocalSettlementTimeline } from './localSettlementTimeline'
-import { createLocalTileFlowExecutor } from './localTileFlowExecutor'
+import { createLocalTileFlowExecutor, type LocalSpecialDrawDeps, type SpecialDrawHandler } from './localTileFlowExecutor'
 import { createLocalTimerScheduler } from './localTimerScheduler'
 import { createLocalTransientEventPresenter } from './localTransientEventPresenter'
 import { createLocalTurnOrchestrator } from './localTurnOrchestrator'
@@ -81,6 +81,20 @@ interface UseGameOptions {
   analysis?: AnalysisRecorder | null
   /** Local LLM request/answer correlator; receives this engine's current window. */
   analysisSink?: LotusClassicDecisionSink | null
+  /** 变体牌墙工厂（花牌玩法传 createWallWithFlowers）；缺省为经典 136 张。 */
+  createWallTiles?: () => TileType[]
+  /** 牌墙总张数（拆墙断点环几何与牌尾补摸基准）；缺省 136。 */
+  wallTotal?: number
+  /**
+   * 变体自定义「摸到特殊牌」处理（花牌玩法等）。给定时先于默认红中逻辑询问；
+   * 返回 undefined 表示非该变体的特殊牌，继续落回默认红中逻辑。
+   */
+  createSpecialDraw?: (deps: LocalSpecialDrawDeps) => SpecialDrawHandler
+  /**
+   * 变体「发牌后摘特殊牌补摸」处理（花牌玩法等），返回即时胜利座位（-1 无）。
+   * 缺省为红中逻辑。
+   */
+  createDealSpecials?: (deps: LocalDealSpecialsDeps) => () => number | Promise<number>
 }
 
 export function useGame({
@@ -97,6 +111,10 @@ export function useGame({
   recorder,
   analysis = null,
   analysisSink = null,
+  createWallTiles,
+  wallTotal,
+  createSpecialDraw,
+  createDealSpecials,
 }: UseGameOptions = {}) {
   const state = createLocalGameState()
   const selectors = createLocalGameSelectors(state, ruleset)
@@ -659,6 +677,8 @@ export function useGame({
     wait: scheduler.wait,
     stopCountdown: countdown.stop,
     followDealer,
+    initialWallSize: wallTotal,
+    createSpecialDraw,
   })
   if (recorder) {
     // 必须在创建编排器/动作控制器之前包装：它们按引用捕获这两个函数。
@@ -718,6 +738,9 @@ export function useGame({
     endGame,
     playerSeeds: aiPlayerSeeds,
     humanPlayerSeed,
+    createWallTiles,
+    wallTotal,
+    createDealSpecials,
     // P1 §6：重跑参数（环状牌墙 + 开局骰子 + 庄家 + 牌山断点）在"发牌之前、骰子已定"那一刻交出。
     // 广麻没有翻精 ⇒ 这里比翻精癞子少一整套参数（没有翻精墩/开牌断点重排）。
     onRoundPrepared: (info) => safely('opening-parameters', () => {

@@ -19,6 +19,8 @@ export interface ScoreHandOptions {
   robbedKong?: boolean
   /** 赢家已亮出的红中张数：每张按一份底分加算（经典广麻）。 */
   redCount?: number
+  /** 赢家已亮出的花牌（春夏秋冬梅兰竹菊）：花牌玩法用，经典广麻忽略。 */
+  flowerTiles?: readonly TileType[]
 }
 
 export interface ScoreHandDetail {
@@ -33,6 +35,8 @@ export interface ScoreHandResult {
   horsePoints: number
   /** 红中加成分（经典广麻：每张已亮红中 × 底分）；其他玩法可省略。 */
   redPoints?: number
+  /** 花牌加成分（花牌玩法：亮花底分 + 组集加番）；其他玩法可省略。 */
+  flowerPoints?: number
   points: number
   details: ScoreHandDetail[]
 }

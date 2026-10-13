@@ -3,7 +3,7 @@ import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.j
 import { isHorseForSeat, sortTilesWithJokers } from '../../../game/core/rules/tiles'
 import { meldDisplayTiles, meldSourceTileIndex } from '../../../game/core/rules/rules'
 import { addedKongTileOffset, TABLE_LAYOUT, meldTileCenter, discardTileLayout, meldTrackTransform, concealedMeldClear, concealedSideX } from '../../../game/core/presentation/tableLayout'
-import { wallBreakIndexForDealer, wallStackSlot, wallTilePlacement, WALL_TOTAL } from '../../../game/core/rules/wallLayout'
+import { wallBreakIndexForDealer, wallGeometryFor, wallStackSlot, wallTilePlacement, WALL_TOTAL } from '../../../game/core/rules/wallLayout'
 import { splitWinningTile } from '../../../game/core/presentation/winEffect'
 import type { TableActionEvent, TileType } from '../../../game/core/contracts/types'
 import type { TileInstanceRenderer } from './tileInstanceRenderer'
@@ -67,6 +67,9 @@ export function createTableTilePresenter(options: TableTilePresenterOptions) {
   const TILE_GAP_OFFSET = options.tileGapOffset
   const POINT_GAP_OFFSET = options.pointGapOffset
   const WALL_DEAL_ORIGIN_Y = options.wallDealOriginY
+  // 牌墙总数（含花牌玩法 144 张）：环几何、断点换算、摸牌位全部按它参数化。
+  const WALL = props.wallTotal ?? WALL_TOTAL
+  const wallGeometry = wallGeometryFor(WALL)
   const dealTweens: DealTween[] = []
   const meldTweens: MeldTween[] = []
   const discardTweens: DealTween[] = []
@@ -399,16 +402,17 @@ function addMelds(playerIndex) {
 // 现行玩法仍按骰子规则计算。
 function resolveBreakIndex() {
   // wallBreakIndex 是房主维护的绝对物理牌墙坐标；牌桌上的玩家和牌山
-  // 都要按当前客户端的绝对座位旋转到本地视角。每个座位占 17 墩 / 34 张牌。
-  const base = props.wallBreakIndex ?? wallBreakIndexForDealer(props.diceValues, props.dealerIndex ?? 0)
+  // 都要按当前客户端的绝对座位旋转到本地视角。每个座位占 1/4 环
+  // （136 张墙 17 墩 / 34 张，含花牌 144 张墙 18 墩 / 36 张）。
+  const base = props.wallBreakIndex ?? wallBreakIndexForDealer(props.diceValues, props.dealerIndex ?? 0, WALL)
   const localSeat = ((props.localSeat ?? 0) % 4 + 4) % 4
-  return (base + localSeat * (WALL_TOTAL / 4)) % WALL_TOTAL
+  return (base + localSeat * (WALL / 4)) % WALL
 }
 
 function resolveFlipStack() {
   if (props.flipStack == null) return null
   const localSeat = ((props.localSeat ?? 0) % 4 + 4) % 4
-  return (props.flipStack + localSeat * (WALL_TOTAL / 8)) % (WALL_TOTAL / 2)
+  return (props.flipStack + localSeat * (WALL / 8)) % (WALL / 2)
 }
 
 // 牌山 head 位置 = 下一张要摸的牌所在处：wall[0] 经 wallHeadDrawn 沿环顺时针推进。
@@ -417,11 +421,11 @@ function wallDrawHeadPos() {
   const breakIndex = resolveBreakIndex()
   if (props.flipStack != null) {
     const physical = wallPhysicalIndex(headOffset, breakIndex)
-    const slot = wallStackSlot(Math.floor(physical / 2))
+    const slot = wallStackSlot(Math.floor(physical / 2), wallGeometry)
     return { x: slot.x, z: slot.z }
   }
-  const { stackIndex } = wallTilePlacement(0, (breakIndex + headOffset) % WALL_TOTAL, props.wall?.length ?? 0, headOffset)
-  const slot = wallStackSlot(stackIndex)
+  const { stackIndex } = wallTilePlacement(0, (breakIndex + headOffset) % WALL, props.wall?.length ?? 0, headOffset, WALL)
+  const slot = wallStackSlot(stackIndex, wallGeometry)
   return { x: slot.x, z: slot.z }
 }
 
@@ -431,14 +435,14 @@ function wallDrawHeadPos() {
  */
 function wallPhysicalIndex(index: number, head: number): number {
   const flip = resolveFlipStack()
-  if (flip == null) return (head + index) % WALL_TOTAL
+  if (flip == null) return (head + index) % WALL
   const skipA = flip * 2
   let physical = head
   while (physical === skipA || physical === skipA + 1) {
-    physical = (physical + 1) % WALL_TOTAL
+    physical = (physical + 1) % WALL
   }
   for (let step = 0; step < index; step += 1) {
-    do { physical = (physical + 1) % WALL_TOTAL } while (physical === skipA || physical === skipA + 1)
+    do { physical = (physical + 1) % WALL } while (physical === skipA || physical === skipA + 1)
   }
   return physical
 }
@@ -448,7 +452,7 @@ function wallPhysicalIndex(index: number, head: number): number {
 function addFlipIndicator() {
   const flipStack = resolveFlipStack()
   if (flipStack == null) return
-  const slot = wallStackSlot(flipStack)
+  const slot = wallStackSlot(flipStack, wallGeometry)
   // 翻精墩底层牌保留在牌山上（背朝上，与周围牌墙一致）
   const baseQuat = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, slot.rotationY, 0))
   baseQuat.multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.PI, 0, 0)))
@@ -488,7 +492,8 @@ function addFlipIndicator() {
   }
 }
 
-// 四边环状牌山（参考欢乐麻将）：wall[i] → 物理槽 (breakIndex + headOffset + i) % 136。
+// 四边环状牌山（参考欢乐麻将）：wall[i] → 物理槽 (breakIndex + headOffset + i) % WALL
+//（136 张；含花牌玩法传 props.wallTotal=144，按同一套参数化几何铺满 72 墩）。
 // 每墩 2 张上下叠，牌径向放置（长边指向桌中心），X-180° 翻转让绿色牌背朝上。
 // headOffset = wallHeadDrawn（从牌头累计摸走的张数），使 head 顺时针推进（抓牌顺时针）；
 // 开杠/红中从牌尾补张（pop）不计入，因此牌尾端会正确地随之缩短。
@@ -502,7 +507,7 @@ function addWall() {
   tiles.forEach((_, index) => {
     const { stackIndex, layer } = hasFlip
       ? (() => {
-        const tailDrawn = Math.max(0, WALL_TOTAL - 2 - headOffset - tiles.length)
+        const tailDrawn = Math.max(0, WALL - 2 - headOffset - tiles.length)
         // 补走一张顶层牌后，同墩剩余的底层牌仍应留在原物理张位。
         const physicalIndex = tailDrawn % 2 === 1 && index === tiles.length - 1 ? index + 1 : index
         const physical = wallPhysicalIndex(headOffset + physicalIndex, breakIndex)
@@ -511,8 +516,8 @@ function addWall() {
           layer: 1 - (physical % 2),
         }
       })()
-      : wallTilePlacement(index, (breakIndex + headOffset) % WALL_TOTAL, tiles.length, headOffset)
-    const slot = wallStackSlot(stackIndex)
+      : wallTilePlacement(index, (breakIndex + headOffset) % WALL, tiles.length, headOffset, WALL)
+    const slot = wallStackSlot(stackIndex, wallGeometry)
     const y = .41 + layer * .47
     const quat = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, slot.rotationY, 0))
     // 背朝上：绕 X 转 180°，使 base 底面的牌背（backMaterial）朝上（与暗杠首尾一致）。

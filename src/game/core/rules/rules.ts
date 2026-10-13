@@ -1,4 +1,4 @@
-import { TILE_TYPES, isHorseForSeat, type HorseSeat } from './tiles'
+import { TILE_TYPES, isFlowerTile, isHorseForSeat, type HorseSeat } from './tiles'
 import type { GamePlayer, Meld, ScoreDelta, TileType } from '../contracts/types'
 import { consumeTile, countTiles, firstRemainingTile, matchingCount } from '../../shared/rules/tileTools'
 import type { RuleSet, ScoreHandOptions, ScoreHandResult } from './ruleset'
@@ -185,6 +185,13 @@ export function scoreHand({ noJoker = false, fourRed = false, kongBloom = false,
   // 中马与红中始终按张数加底分：底分 × 倍数 + 中马数 × 底分 + 红中数 × 底分。
   const points = multiplier * BASE_SCORE + horsePoints + redPoints
   return { multiplier, totalMultiplier, horsePoints, redPoints, points, details }
+}
+
+/** 提取玩家已亮出的花牌（按副露顺序）。红中花副不算花牌（广麻红中另有计分）。 */
+export function flowerTilesOfMelds(melds: readonly Meld[]): TileType[] {
+  return melds
+    .filter((meld) => meld.type === 'flower' && isFlowerTile(meld.tile))
+    .map((meld) => meld.tile)
 }
 
 /**

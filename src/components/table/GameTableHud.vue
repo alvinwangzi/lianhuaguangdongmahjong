@@ -6,6 +6,7 @@ import TableActionCue from './TableActionCue.vue'
 import { splitWinningTile } from '../../game/core/presentation/winEffect'
 import { defaultAvatarForSeat } from '../../game/core/presentation/avatar'
 import { tileName } from '../../game/core/rules/tiles'
+import { WALL_TOTAL_FLOWERS } from '../../game/core/rules/wallLayout'
 import type { ActionPrompt, Announcement, DealAnimation, GamePhase, LastDiscard, OpeningStage, RoundResult, WaitInfo, WinEffect } from '../../game/core/contracts/gamePort'
 import type { GamePlayer, ScoreFlowEvent, TableActionEvent, TileType, WinPresentation } from '../../game/core/contracts/types'
 import type { TableThemeName } from './three/tableTheme'
@@ -71,7 +72,7 @@ interface Props {
   autoPlayEnabled?: boolean
   /** 当前是否已开启托管（联机自动出牌/过牌） */
   autoPlay?: boolean
-  rulesetId?: 'lotus-classic' | 'lotus-legacy' | 'lotus-blood-flow'
+  rulesetId?: 'lotus-classic' | 'lotus-legacy' | 'lotus-blood-flow' | 'lotus-flowers'
   bloodFlow?: BloodFlowTableState | null
   /** 联机（房间）对局：结算页的「退出本场」与暂离文案只在这种模式下有意义。 */
   online?: boolean
@@ -90,6 +91,8 @@ interface Props {
 }
 
 const props = defineProps<Props>()
+/** 含花牌玩法（lotus-flowers）的 3D 牌墙为 144 张，据此重建牌山环几何。 */
+const wallTotal = computed(() => props.rulesetId === 'lotus-flowers' ? WALL_TOTAL_FLOWERS : undefined)
 const userAnimeStyle = computed(() => props.themeName === 'llmAnime'
   ? { '--anime-accent': animeCharacterAccent(props.user.characterId) }
   : undefined)
@@ -522,6 +525,7 @@ function onAvatarError(entry: GamePlayer) {
       :opening-stage="openingStage" :dice-values="diceValues" :dealer-index="dealer" :dice-thrower-index="diceThrowerIndex"
       :table-action-event="tableActionEvent"
       :wall-break-index="wallBreakIndex"
+      :wall-total="wallTotal"
       :flip-tile="flipTile"
       :flip-stack="flipStack"
       :blood-flow-batches="bloodFlow?.batches"

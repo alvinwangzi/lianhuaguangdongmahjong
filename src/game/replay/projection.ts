@@ -7,6 +7,7 @@ import type { GamePlayer, Meld, TableActionEvent, TileType } from '../core/contr
 import type { LastDiscard } from '../core/contracts/gamePort'
 import type { TableProps } from '../../components/table/three/tableRenderTypes'
 import { sortTilesWithJokers } from '../core/rules/tiles'
+import { WALL_TOTAL_FLOWERS } from '../core/rules/wallLayout'
 import type { ReplayMatch, ReplayRound, ReplayStep } from './types'
 import type { WinPileBatch } from '../../components/table/three/bloodFlowWinPile'
 import type { Seat } from '../variants/lotus/bloodFlow/types'
@@ -163,6 +164,8 @@ export function buildReplayFrames(
         diceThrowerIndex: localOf(round.diceThrowerIndex),
         tableActionEvent: actionEvent,
         wallBreakIndex: round.wallBreakIndex,
+        // 含花牌玩法：3D 牌墙按 144 张环几何铺设
+        wallTotal: match.rulesetId === 'lotus-flowers' ? WALL_TOTAL_FLOWERS : undefined,
         flipTile: round.flipTile,
         flipStack: round.flipStack ?? undefined,
         // 血流牌堆（盖楼）：到当前帧为止已经胡过的楼

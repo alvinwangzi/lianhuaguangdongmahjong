@@ -91,6 +91,8 @@ export interface RoundResult {
   horsePoints?: number
   /** 红中加成分（经典广麻：每张已亮红中 × 底分）。 */
   redPoints?: number
+  /** 花牌加成分（花牌玩法：亮花底分 + 组集加番）。 */
+  flowerPoints?: number
   points?: number
   totalWon?: number
   details?: RoundScoreDetail[]
@@ -140,6 +142,8 @@ export interface GameCapabilities {
     wallBreakIndex: number
     flipStack: number | null
   }
+  /** 花牌玩法：本家已亮出的花牌（随对局推进更新）。 */
+  flowers?: { tiles: TileType[]; count: number }
 }
 
 export interface GamePort {

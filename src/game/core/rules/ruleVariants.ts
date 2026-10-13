@@ -1,4 +1,4 @@
-export type RuleVariant = 'lotus-classic' | 'lotus-legacy' | 'lotus-blood-flow'
+export type RuleVariant = 'lotus-classic' | 'lotus-legacy' | 'lotus-blood-flow' | 'lotus-flowers'
 
 export interface RuleVariantOption {
   id: RuleVariant
@@ -28,6 +28,14 @@ export const RULE_VARIANTS: readonly RuleVariantOption[] = [
     highlights: ['翻精癞子', '支持吃牌', '十三烂/七星/十三幺等胡型'],
     badge: '',
     rulesetId: 'lotus-legacy',
+  },
+  {
+    id: 'lotus-flowers',
+    name: '花牌广麻',
+    description: '广麻 + 花牌：摸花即亮、补摸继续',
+    highlights: ['春夏秋冬梅兰竹菊', '摸花亮出自动补摸', '集组加番 · 八花齐放'],
+    badge: '新',
+    rulesetId: 'lotus-flowers',
   },
 ]
 

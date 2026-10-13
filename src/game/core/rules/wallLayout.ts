@@ -14,6 +14,28 @@
 
 export const WALL_TOTAL = 136
 export const WALL_STACKS = 68
+/** 含花牌牌墙（144 张 / 72 墩）：数牌字牌各 4 张 + 花牌各 1 张。 */
+export const WALL_TOTAL_FLOWERS = 144
+export const WALL_STACKS_FLOWERS = 72
+
+/** 按牌墙总数计算每边墩数与半长等几何参数（默认 136 张 / 68 墩）。 */
+export interface WallGeometry {
+  total: number
+  stacks: number
+  stacksPerSide: number
+  segmentHalf: number
+}
+
+export function wallGeometryFor(total = WALL_TOTAL, stacks = total / 2): WallGeometry {
+  const stacksPerSide = stacks / 4
+  return {
+    total,
+    stacks,
+    stacksPerSide,
+    segmentHalf: (stacksPerSide - 1) * STACK_SPACING / 2,
+  }
+}
+
 const STACKS_PER_SIDE = WALL_STACKS / 4  // 17 墩/边
 const STACK_SPACING = 0.68               // 墩沿墙方向的间距（牌宽，径向放置时短边沿墙）
 
@@ -46,6 +68,7 @@ export interface WallSlot {
 /**
  * 按指定庄家计算拆墙点。dealer 是绝对座位：0=本家/近侧、1=右侧、2=对家、3=左侧。
  * 点数先决定相对庄家的墙段，再换算到固定牌桌物理环。
+ * 含花牌玩法传 total=WALL_TOTAL_FLOWERS（墙段起点按 144 张环重算）。
  */
 export function wallBreakIndexForDealer(
   dice: readonly [number, number] | number[],
@@ -57,7 +80,8 @@ export function wallBreakIndexForDealer(
   const sum = d1 + d2
   const n = Math.min(d1, d2)
   const wallPlayer = (((dealer % 4) + 4) % 4 + (sum - 1)) % 4
-  const segmentStart = [0, 102, 68, 34][wallPlayer]
+  // 各玩家墙段起点 = 该座位前墙段张数：庄=0、下=3/4 环、对=1/2 环、上=1/4 环。
+  const segmentStart = [0, (total * 3) / 4, total / 2, total / 4][wallPlayer]
   return (segmentStart + n * 2) % total
 }
 
@@ -68,42 +92,48 @@ export function wallBreakIndex(dice: readonly [number, number] | number[], total
 
 /** 第 i 张当前牌（wall[i]）在固定环中的墩位与层（0=底牌，1=顶牌）。
  * 牌头正常按上、下层摸取；牌尾不设固定王牌区，只把当前最后一墩按杠后
- * pop() 的顺序显示为上、下层。remainingCount 是当前尚未摸走的牌数。 */
+ * pop() 的顺序显示为上、下层。remainingCount 是当前尚未摸走的牌数。
+ * 含花牌玩法传 total=WALL_TOTAL_FLOWERS。 */
 export function wallTilePlacement(
   tileIndex: number,
   physicalHead: number,
   remainingCount = WALL_TOTAL,
   headDrawn = 0,
+  total = WALL_TOTAL,
 ) {
-  const tailDrawn = Math.max(0, WALL_TOTAL - headDrawn - remainingCount)
+  const tailDrawn = Math.max(0, total - headDrawn - remainingCount)
   const lastIndex = remainingCount - 1
   // 尾墩上层被 splice 掉后，数组末张仍是该墩底层，物理位置需跳过一个槽。
   const physicalIndex = tailDrawn % 2 === 1 && tileIndex === lastIndex ? tileIndex + 1 : tileIndex
-  const physical = (physicalHead + physicalIndex) % WALL_TOTAL
+  const physical = (physicalHead + physicalIndex) % total
   const stackIndex = Math.floor(physical / 2)
   const layer = 1 - (physical % 2)
   return { stackIndex, layer }
 }
 
-/** 环形第 stack 个墩（0..67）的位置。牌径向放置：长边指向桌中心（近/远墙沿 z，侧墙沿 x）。 */
-export function wallStackSlot(stackIndex: number): WallSlot {
-  const s = ((stackIndex % WALL_STACKS) + WALL_STACKS) % WALL_STACKS
-  if (s < STACKS_PER_SIDE) {
+/** 环形第 stack 个墩的位置。牌径向放置：长边指向桌中心（近/远墙沿 z，侧墙沿 x）。
+ * 含花牌玩法传 wallGeometryFor(WALL_TOTAL_FLOWERS) 以获得 72 墩环几何。 */
+export function wallStackSlot(stackIndex: number, geometry: WallGeometry | null = null): WallSlot {
+  const stacks = geometry?.stacks ?? WALL_STACKS
+  const stacksPerSide = geometry?.stacksPerSide ?? STACKS_PER_SIDE
+  const segmentHalf = geometry?.segmentHalf ?? SEGMENT_HALF
+  const s = ((stackIndex % stacks) + stacks) % stacks
+  if (s < stacksPerSide) {
     // 近侧墙：head 在右端，沿 x 向左推进
     const t = s
-    return { x: SEGMENT_HALF - t * STACK_SPACING, z: NEAR_Z, rotationY: 0 }
+    return { x: segmentHalf - t * STACK_SPACING, z: NEAR_Z, rotationY: 0 }
   }
-  if (s < 2 * STACKS_PER_SIDE) {
+  if (s < 2 * stacksPerSide) {
     // 左墙：z 从近到远（顺时针）
-    const t = s - STACKS_PER_SIDE
-    return { x: -SIDE_X, z: SIDE_CENTER_Z + SEGMENT_HALF - t * STACK_SPACING, rotationY: Math.PI / 2 }
+    const t = s - stacksPerSide
+    return { x: -SIDE_X, z: SIDE_CENTER_Z + segmentHalf - t * STACK_SPACING, rotationY: Math.PI / 2 }
   }
-  if (s < 3 * STACKS_PER_SIDE) {
+  if (s < 3 * stacksPerSide) {
     // 远侧墙：x 从左到右
-    const t = s - 2 * STACKS_PER_SIDE
-    return { x: -SEGMENT_HALF + t * STACK_SPACING, z: FAR_Z, rotationY: 0 }
+    const t = s - 2 * stacksPerSide
+    return { x: -segmentHalf + t * STACK_SPACING, z: FAR_Z, rotationY: 0 }
   }
   // 右墙：z 从远到近
-  const t = s - 3 * STACKS_PER_SIDE
-  return { x: SIDE_X, z: SIDE_CENTER_Z - SEGMENT_HALF + t * STACK_SPACING, rotationY: Math.PI / 2 }
+  const t = s - 3 * stacksPerSide
+  return { x: SIDE_X, z: SIDE_CENTER_Z - segmentHalf + t * STACK_SPACING, rotationY: Math.PI / 2 }
 }

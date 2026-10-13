@@ -30,6 +30,13 @@ export const TILE_TYPES: TileType[] = [
 /** 全部牌面类型（含花牌），用于资源加载与展示层。玩法规则仍使用 TILE_TYPES（34 张）。 */
 export const ALL_TILE_TYPES: TileType[] = [...TILE_TYPES, ...FLOWERS] as TileType[]
 
+const FLOWER_SET = new Set<FlowerTile>(FLOWERS)
+
+/** 是否为花牌（春夏秋冬梅兰竹菊）。红中不是花牌——它是广麻的独立特殊牌。 */
+export function isFlowerTile(tile: TileType): tile is FlowerTile {
+  return FLOWER_SET.has(tile as FlowerTile)
+}
+
 const HONOR_FACE_INDEX = { east: 1, south: 2, west: 3, north: 4, red: 5, green: 6, white: 7 }
 const FLOWER_FACE_INDEX: Record<FlowerTile, number> = {
   spring: 1, summer: 2, autumn: 3, winter: 4,

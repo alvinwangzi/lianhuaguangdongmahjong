@@ -60,6 +60,15 @@ const rules = computed(() => {
       ['起始分数', '每位玩家起始 2000 分，基础结算单位 100。'],
     ]
   }
+  if (props.variant === 'lotus-flowers') {
+    return [
+      ['玩法基础', '与莲花广麻同一套规则：只碰不吃、仅自摸或抢杠胡、白板癞子、胡后买马；在此基础上加入 8 张花牌（春夏秋冬、梅兰竹菊），牌墙 144 张。'],
+      ['摸花亮出', '摸到花牌不进手牌：立即亮出到自己门前，并从牌墙尾补摸一张；补摸仍是花牌则继续亮出补摸。开局发到手的花牌同样处理。'],
+      ['花牌计分', '胡牌时自己已亮的花牌每张加算一份底分；集齐「春夏秋冬」或「梅兰竹菊」一组各加 1 番；八张全收额外加 2 番（八花齐放）。'],
+      ['红中不变', '红中机制保持：摸到红中亮出补摸，第四张红中立即胡牌；红中与花牌分别计分。'],
+      ['胡牌结构', '花牌不占手牌、不参与胡牌牌型，听牌与胡牌判定与莲花广麻完全一致。'],
+    ]
+  }
   return [
     ['多端兼容', '电脑端：鼠标单击出牌、移动端：手机双击出牌或上滑出牌'],
     ['只碰不吃', '可以碰牌、明杠、暗杠，不能吃牌。'],
@@ -72,8 +81,10 @@ const rules = computed(() => {
   ]
 })
 
-const panelTitle = computed(() => props.variant === 'lotus-blood-flow' ? '莲花麻将·血流玩法' : props.variant === 'lotus-legacy' ? '莲花麻将玩法' : '莲花广麻玩法')
-const baseNote = computed(() => props.variant === 'lotus-blood-flow' ? `底分 ${BLOOD_FLOW_CONFIG.basePoints} · 单家每次最多 ${BLOOD_FLOW_CONFIG.basePoints * BLOOD_FLOW_CONFIG.maxMultiplierPerPayer} 分 · 牌墙耗尽结束本局` : props.variant === 'lotus-legacy'
+const panelTitle = computed(() => props.variant === 'lotus-blood-flow' ? '莲花麻将·血流玩法' : props.variant === 'lotus-legacy' ? '莲花麻将玩法' : props.variant === 'lotus-flowers' ? '花牌广麻玩法' : '莲花广麻玩法')
+const baseNote = computed(() => props.variant === 'lotus-blood-flow' ? `底分 ${BLOOD_FLOW_CONFIG.basePoints} · 单家每次最多 ${BLOOD_FLOW_CONFIG.basePoints * BLOOD_FLOW_CONFIG.maxMultiplierPerPayer} 分 · 牌墙耗尽结束本局` : props.variant === 'lotus-flowers'
+  ? `基础分 ${BASE_SCORE} 分 · 总分 = 底分 × 倍数 + 中马数 × 底分 + 红中数 × 底分 + 花牌加分`
+  : props.variant === 'lotus-legacy'
   ? `基础单位 ${BASE_SCORE} 分 · 番数×底分，按身份收付`
   : `基础分 ${BASE_SCORE} 分 · 总分 = 底分 × 倍数 + 中马数 × 底分 + 红中数 × 底分`)
 </script>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { WALL_STACKS, WALL_TOTAL, wallBreakIndex, wallBreakIndexForDealer, wallStackSlot, wallTilePlacement } from './wallLayout'
+import { WALL_STACKS, WALL_TOTAL, WALL_TOTAL_FLOWERS, wallBreakIndex, wallBreakIndexForDealer, wallGeometryFor, wallStackSlot, wallTilePlacement } from './wallLayout'
 
 describe('wall break index', () => {
   it('determines the wall by dice sum: 5/9→庄, 2/6/10→下, 3/7/11→对, 4/8/12→上', () => {
@@ -135,5 +135,64 @@ describe('wallBreakIndexForDealer（按庄家拆墙）', () => {
       expect(wallStackSlot(start / 2).z).toBe(wallStackSlot(slots[seat]).z)
       expect(wallStackSlot(start / 2).x).toBe(wallStackSlot(slots[seat]).x)
     })
+  })
+})
+
+describe('含花牌牌墙（144 张 / 72 墩）参数化', () => {
+  const geometry = wallGeometryFor(WALL_TOTAL_FLOWERS)
+
+  it('wallGeometryFor 按总数推导墩数与段半长；默认不回归 136', () => {
+    expect(geometry).toEqual({ total: 144, stacks: 72, stacksPerSide: 18, segmentHalf: (18 - 1) * 0.68 / 2 })
+    expect(wallGeometryFor()).toEqual({ total: 136, stacks: 68, stacksPerSide: 17, segmentHalf: (17 - 1) * 0.68 / 2 })
+  })
+
+  it('按 144 环换算拆墙点：段起点 0/108/72/36', () => {
+    // [5,4]: sum 9 → 庄家段[0,35]，n=4 → 0+8=8
+    expect(wallBreakIndexForDealer([5, 4], 0, WALL_TOTAL_FLOWERS)).toBe(8)
+    // [2,4]: sum 6 → 下家段起点 108，n=2 → 112
+    expect(wallBreakIndexForDealer([2, 4], 0, WALL_TOTAL_FLOWERS)).toBe(112)
+    // [1,6]: sum 7 → 对家段起点 72，n=1 → 74
+    expect(wallBreakIndexForDealer([1, 6], 0, WALL_TOTAL_FLOWERS)).toBe(74)
+    // [4,4]: sum 8 → 上家段起点 36，n=4 → 44
+    expect(wallBreakIndexForDealer([4, 4], 0, WALL_TOTAL_FLOWERS)).toBe(44)
+    // 庄家=座位 1（右段起点 108）：sum 9 → 108+8=116
+    expect(wallBreakIndexForDealer([5, 4], 1, WALL_TOTAL_FLOWERS)).toBe(116)
+  })
+
+  it('wallTilePlacement 在 144 张环上成墩配对且按总数回卷', () => {
+    expect(wallTilePlacement(0, 0, WALL_TOTAL_FLOWERS, 0, WALL_TOTAL_FLOWERS)).toEqual({ stackIndex: 0, layer: 1 })
+    expect(wallTilePlacement(1, 0, WALL_TOTAL_FLOWERS, 0, WALL_TOTAL_FLOWERS)).toEqual({ stackIndex: 0, layer: 0 })
+    // 尾墩：物理张位 142/143 → 墩 71
+    expect(wallTilePlacement(142, 0, WALL_TOTAL_FLOWERS, 0, WALL_TOTAL_FLOWERS)).toEqual({ stackIndex: 71, layer: 1 })
+    expect(wallTilePlacement(143, 0, WALL_TOTAL_FLOWERS, 0, WALL_TOTAL_FLOWERS)).toEqual({ stackIndex: 71, layer: 0 })
+    // 回卷：physicalHead=144 等价 0
+    expect(wallTilePlacement(0, WALL_TOTAL_FLOWERS, WALL_TOTAL_FLOWERS, 0, WALL_TOTAL_FLOWERS)).toEqual({ stackIndex: 0, layer: 1 })
+  })
+
+  it('wallStackSlot 按 72 墩几何铺满四边、墩距不变', () => {
+    expect(wallStackSlot(0, geometry).z).toBeCloseTo(5.17, 5)
+    expect(Math.abs(wallStackSlot(18, geometry).x)).toBeCloseTo(6.82, 5)   // 左墙起点
+    expect(wallStackSlot(36, geometry).z).toBeCloseTo(-8.47, 5)            // 远墙起点
+    expect(Math.abs(wallStackSlot(54, geometry).x)).toBeCloseTo(6.82, 5)   // 右墙起点
+    // 相邻墩间距仍是 0.68（每边 18 墩）
+    expect(Math.hypot(
+      wallStackSlot(0, geometry).x - wallStackSlot(1, geometry).x,
+      wallStackSlot(0, geometry).z - wallStackSlot(1, geometry).z,
+    )).toBeCloseTo(0.68, 5)
+    // 回卷按 72 墩取模（不与 68 墩几何混用）
+    expect(wallStackSlot(72, geometry)).toEqual(wallStackSlot(0, geometry))
+  })
+
+  it('72 墩全部落在牌面范围内且不重叠（相邻墩 x/z 距离 ≥ 0.68）', () => {
+    for (let s = 0; s < 72; s += 1) {
+      const { x, z } = wallStackSlot(s, geometry)
+      expect(Math.abs(x)).toBeLessThanOrEqual(10.5)
+      expect(z).toBeGreaterThanOrEqual(-12.1)
+      expect(z).toBeLessThanOrEqual(8.9)
+      if (s > 0) {
+        const prev = wallStackSlot(s - 1, geometry)
+        expect(Math.hypot(prev.x - x, prev.z - z)).toBeGreaterThanOrEqual(0.68 - 1e-9)
+      }
+    }
   })
 })
